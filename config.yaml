@@ -1,0 +1,45 @@
+user_path: '../Monitoring/eua-dataset-master/users/users-melbcbd-generated.csv'
+server_eua_path: '../Monitoring/eua-dataset-master/edge-servers/site-optus-melbCBD.csv'
+server_telecom_path: '../Monitoring/dataset-telecom/data_6.1~6.30_.xlsx'
+
+telecom_miu: 80
+telecom_sigma: 20
+telecom_radius_low: 3
+telecom_radius_high: 7
+batch_large_size: 12
+telecom_train_user_num: 1500
+telecom_train_server_percent: 25
+telecom_train_dataset_save_path: '../Monitoring/data/telecom/data_train'
+telecom_test_save_path: '../Monitoring/data/telecom/data_test'
+
+eua_miu: 35
+eua_sigma: 10
+eua_radius_low: 3
+eua_radius_high: 7
+batch_normal_size: 32
+eua_train_user_num: 800
+eua_train_server_percent: 50
+eua_train_dataset_save_path: '../Monitoring/data/eua/data_train'
+eua: '../Monitoring/data/eua/data_test'
+
+train_data_size:
+  train: 10000
+  valid: 1000
+
+test_data_size:
+  test: 100
+
+d_model: 64
+dropout: 0.1
+num_heads: 4
+edge_dim: 64
+user_feature_dim: 6
+server_feature_dim: 7
+spatial_raw_dim: 3
+server_state_dim: 5
+lr: 1.0e-4
+patience: 25
+
+
+
+

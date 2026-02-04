@@ -14,8 +14,8 @@ telecom_test_save_path: '../Monitoring/data/telecom/data_test'
 
 eua_miu: 35
 eua_sigma: 10
-eua_radius_low: 3
-eua_radius_high: 7
+eua_radius_low: 1
+eua_radius_high: 2
 batch_normal_size: 32
 eua_train_user_num: 800
 eua_train_server_percent: 50
@@ -39,6 +39,7 @@ spatial_raw_dim: 3
 server_state_dim: 5
 lr: 1.0e-4
 patience: 25
+
 
 
 

@@ -333,8 +333,7 @@ class MACAllocator_Ablate_NOT(nn.Module):
         # 传播时延
         p_lat = calculate_propagation_latency(allocated, p_distance)  # [B]（原始时延）
         p_lat_normalized = p_lat / self.MAX_PROPAGATION_LATENCY  # [B]（归一化时延）
-        # 奖励（最大化分配率+利用率，最小化时延）
-        # reward = alloc_ratio + 0.05 * (capacity_used_ratio - p_lat_normalized)
+        # 奖励
         reward = (
                  alloc_ratio
                 + capacity_used_ratio

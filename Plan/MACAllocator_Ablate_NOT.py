@@ -336,9 +336,9 @@ class MACAllocator_Ablate_NOT(nn.Module):
         # 奖励（最大化分配率+利用率，最小化时延）
         # reward = alloc_ratio + 0.05 * (capacity_used_ratio - p_lat_normalized)
         reward = (
-                1.5 * alloc_ratio
-                + 0.1 * capacity_used_ratio
-                - 0.05 * p_lat_normalized
+                 alloc_ratio
+                + capacity_used_ratio
+                - p_lat_normalized
         )
 
         # print(users[:, :, 2:6].sum())

@@ -475,9 +475,9 @@ class MACAllocator(nn.Module):
         p_lat = calculate_propagation_latency(allocated, p_distance)  # [B]（原始时延）
         p_lat_normalized = p_lat / self.MAX_PROPAGATION_LATENCY  # [B]（归一化时延）
         reward = (
-                alloc_ratio
-                capacity_used_ratio
-                p_lat_normalized
+                 alloc_ratio
+                + capacity_used_ratio
+                - p_lat_normalized
         )
 
         # print(users[:, :, 2:6].sum())

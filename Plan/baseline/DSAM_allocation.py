@@ -198,13 +198,6 @@ class AttentionNet(nn.Module):
         return user_allocate_num.float(), user_allocated_props, server_used_props, capacity_used_props
 
     def forward(self, user_input_seq, server_input_seq, masks, latency):
-
-        feature_sum = torch.sum(user_input_seq[:, :, 2:6], dim=2)  # 形状: [batch_size, seq_len]
-        _, sorted_indices = torch.sort(feature_sum, dim=1)
-        expanded_indices = sorted_indices.unsqueeze(2).expand(-1, -1, user_input_seq.size(2))
-        sorted_user_seq = torch.gather(user_input_seq, 1, expanded_indices)
-        user_input_seq = sorted_user_seq
-
         batch_size = user_input_seq.size(0)
         user_len = user_input_seq.size(1)
         server_len = server_input_seq.size(1)
@@ -266,4 +259,5 @@ def can_allocate(workload: torch.Tensor, capacity: torch.Tensor):
     # (batch, 4)
     bools = capacity >= workload
     # (batch)，bool值
+
     return bools.all(dim=1)

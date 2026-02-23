@@ -346,4 +346,4 @@ class MACAllocator_Ablate_NOT(nn.Module):
         # print(servers[:, :, 3:7].sum())
         # print(alloc_num)
 
-        return -reward, logp_accum, alloc_num, alloc_ratio, active_ratio, capacity_used_ratio, p_lat_normalized
+        return -reward, logp_accum, alloc_num, alloc_ratio, active_ratio, capacity_used_ratio, p_lat

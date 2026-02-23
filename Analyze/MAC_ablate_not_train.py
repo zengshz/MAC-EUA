@@ -234,7 +234,7 @@ def smac_transformer_train_panel():
 
         print(
             f"\n[VALID] Epoch {epoch} | BestLoss: {best_val_loss:.4f} | ValLoss: {val_loss_mean:.4f} | User%: {val_user_ratio_mean:.4%}"
-            f" | Server%: {val_svr_ratio_mean:.2%} | Capacity%: {val_cap_ratio_mean:.2%} | Lat/m: {val_prop_lat_mean:.2%}")
+            f" | Server%: {val_svr_ratio_mean:.2%} | Capacity%: {val_cap_ratio_mean:.2%} | Lat/m: {val_prop_lat_mean:.2f}")
 
         # =======================
         # 模型保存 & 早停
@@ -243,7 +243,7 @@ def smac_transformer_train_panel():
             best_val_loss = val_loss_mean
             stagnation = 0
             save_path = os.path.join(model_dir,
-                                     f"{time.strftime('%m%d%H%M')}_{epoch}_alloc_{val_user_ratio_mean:.4f}_cap_{val_cap_ratio_mean:.4f}_lat_{val_prop_lat_mean:.4f}_best.pth")
+                                     f"{time.strftime('%m%d%H%M')}_{epoch}_alloc_{val_user_ratio_mean:.4f}_cap_{val_cap_ratio_mean:.4f}_lat_{val_prop_lat_mean:.2f}_best.pth")
             torch.save(model.state_dict(), save_path)
             print(f"💾 模型已保存: {save_path}")
         else:
@@ -286,3 +286,4 @@ if __name__ == '__main__':
         smac_transformer_train_panel()
     else:
         print("cuda.unavailable!")
+

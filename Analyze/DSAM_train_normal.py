@@ -17,7 +17,7 @@ miu = config.get('eua_miu')
 sigma = config.get('eua_sigma')
 radius_low = config.get('eua_radius_low')
 radius_high = config.get('eua_radius_high')
-batch_size = config.get('batch_normal_size')
+# batch_size = config.get('batch_normal_size')
 user_num = config.get('eua_train_user_num')
 server_percent = config.get('eua_train_server_percent')
 dataset_save_path = config.get('eua_train_dataset_save_path')
@@ -27,7 +27,7 @@ lr = 1.0e-4  # 学习率
 lr_decay = 0.96  # 衰减率
 wait_best_reward_epoch = config.get('patience')
 data_set = 'eua'
-
+batch_size = 40
 
 def DSAM_train_normal():
     # =======================

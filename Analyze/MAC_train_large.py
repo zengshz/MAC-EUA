@@ -1,3 +1,27 @@
+import importlib
+import subprocess
+import sys
+
+
+def _ensure_package(import_name, pip_name=None):
+    """若缺少依赖则自动安装。"""
+    try:
+        importlib.import_module(import_name)
+    except ImportError:
+        pkg = pip_name or import_name
+        print(f"[AutoInstall] 未检测到依赖 {pkg}，正在安装...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+
+
+# 先确保第三方依赖可用
+_ensure_package("yaml", "PyYAML")
+_ensure_package("numpy")
+_ensure_package("tqdm")
+_ensure_package("torch")
+_ensure_package("matplotlib")
+_ensure_package("pandas")
+_ensure_package("openpyxl")
+
 import time
 import yaml
 import os
@@ -34,7 +58,7 @@ spatial_raw_dim = config.get('spatial_raw_dim')
 server_state_dim = config.get('server_state_dim')
 lr = config.get('lr')
 patience = config.get('patience')
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 data_set = 'telecom'
 
 
@@ -110,18 +134,21 @@ def MAC_train_large():
     # =======================
     # 收敛速度记录（训练曲线）
     # =======================
-    curve = {
-        "epoch": [],
-        "train_loss": [],
-        "val_loss": [],
-        "user_ratio": [],
-        "server_ratio": [],
-        "capacity_ratio": [],
-        "prop_lat": [],
-        "lr": [],
-        "time": []
-    }
+    # curve = {
+    #     "epoch": [],
+    #     "train_loss": [],
+    #     "val_loss": [],
+    #     "user_ratio": [],
+    #     "server_ratio": [],
+    #     "capacity_ratio": [],
+    #     "prop_lat": [],
+    #     "lr": [],
+    #     "time": []
+    # }
     start_time = time.time()
+    ema_baseline_interval = int(config.get('ema_baseline_interval', 2))
+    global_step = 0
+    baseline_cache = None
 
     while True:
         model.train()
@@ -134,13 +161,24 @@ def MAC_train_large():
             # -----------------------
             optimizer.zero_grad()
 
-            loss, log_prob, alloc_num, user_ratio, active_ratio, cap_ratio, prop_lat = model(srv, usr, conn, lat)
+            loss, log_prob, alloc_num, user_ratio, active_ratio, prop_lat = model(srv, usr, conn, lat)
 
             # -----------------------
             # 计算 Advantage (baseline)
+            # 降低 baseline 计算频率：每 ema_baseline_interval step 计算一次
             # -----------------------
-            with torch.no_grad():
-                V, *_ = ema_model(srv, usr, conn, lat)
+            # 注意：baseline_cache 只能复用在 shape 一致的 batch 上。
+            # 否则最后一个不满 batch（或数据动态变化）会出现 size mismatch。
+            if (
+                (global_step % ema_baseline_interval == 0)
+                or (baseline_cache is None)
+                or (baseline_cache.shape != loss.shape)
+            ):
+                with torch.no_grad():
+                    V, *_ = ema_model(srv, usr, conn, lat)
+                baseline_cache = V.detach()
+            else:
+                V = baseline_cache
 
             advantage = loss - V
 
@@ -182,6 +220,7 @@ def MAC_train_large():
             lr_scheduler.step()
 
             # check_gradients(model)
+            global_step += 1
 
             # -----------------------
             # EMA 模型更新
@@ -198,7 +237,6 @@ def MAC_train_large():
             alloc_val = float(alloc_num.mean().item())
             ur = float(user_ratio.mean().item()) * 100.0
             svr = float(active_ratio.mean().item()) * 100.0
-            cap = float(cap_ratio.mean().item()) * 100.0
             lat = float(prop_lat.mean().item()) * 100.0
             lr_val = optimizer.param_groups[0]['lr']
 
@@ -208,13 +246,12 @@ def MAC_train_large():
                 "AllocNum": f"{alloc_val:.1f}",
                 "User%": f"{ur:.2f}%",
                 "Svr%": f"{svr:.2f}%",
-                "Cap%": f"{cap:.2f}%",
                 "PropLat": f"{lat:.2f}",
                 "LR": f"{lr_val:.6f}"
             })
             # -------- 显式释放 --------
             del loss, log_prob, alloc_num, user_ratio
-            del active_ratio, cap_ratio, prop_lat
+            del active_ratio, prop_lat
             del V, advantage, reinforce_loss
 
         # =======================
@@ -222,26 +259,24 @@ def MAC_train_large():
         # =======================
         model.eval()
         model.policy = 'greedy'
-        val_losses, val_user_ratios, val_svr_ratios, val_cap_ratios, val_prop_lats = [], [], [], [], []
+        val_losses, val_user_ratios, val_svr_ratios, val_prop_lats = [], [], [], []
 
         with torch.no_grad():
             for srv, usr, conn, lat in valid_loader:
                 srv, usr, conn, lat = map(lambda x: x.to(device), [srv, usr, conn, lat])
-                val_loss, *_, val_user_ratio, val_svr_ratio, val_cap_ratio, val_prop_lat = model(srv, usr, conn, lat)
+                val_loss, *_, val_user_ratio, val_svr_ratio, val_prop_lat = model(srv, usr, conn, lat)
                 val_losses.append(val_loss.mean().item())
                 val_user_ratios.append(val_user_ratio.mean().item())
                 val_svr_ratios.append(val_svr_ratio.mean().item())
-                val_cap_ratios.append(val_cap_ratio.mean().item())
                 val_prop_lats.append(val_prop_lat.mean().item())
         val_loss_mean = np.mean(val_losses)
         val_user_ratio_mean = np.mean(val_user_ratios)
         val_svr_ratio_mean = np.mean(val_svr_ratios)
-        val_cap_ratio_mean = np.mean(val_cap_ratios)
         val_prop_lat_mean = np.mean(val_prop_lats)
 
         print(
             f"\n[VALID] Epoch {epoch} | BestLoss: {best_val_loss:.4f} | ValLoss: {val_loss_mean:.4f} | User%: {val_user_ratio_mean:.4%}"
-            f" | Server%: {val_svr_ratio_mean:.2%} | Capacity%: {val_cap_ratio_mean:.2%} | Lat/m: {val_prop_lat_mean:.2f}")
+            f" | Server%: {val_svr_ratio_mean:.2%} | Lat/m: {val_prop_lat_mean:.2f}")
 
         # =======================
         # 模型保存 & 早停
@@ -250,7 +285,7 @@ def MAC_train_large():
             best_val_loss = val_loss_mean
             stagnation = 0
             save_path = os.path.join(model_dir,
-                                     f"{time.strftime('%m%d%H%M')}_{epoch}_alloc_{val_user_ratio_mean:.4f}_cap_{val_cap_ratio_mean:.4f}_lat_{val_prop_lat_mean:.2f}_best.pth")
+                                     f"{time.strftime('%m%d%H%M')}_{epoch}_alloc_{val_user_ratio_mean:.4f}_lat_{val_prop_lat_mean:.2f}_best.pth")
             torch.save(model.state_dict(), save_path)
             print(f"💾 模型已保存: {save_path}")
         else:
@@ -265,22 +300,25 @@ def MAC_train_large():
         epoch += 1
 
         # =======================
-        # 收敛曲线：记录本 epoch 数据
+        # 收敛曲线记录（已禁用，观察显存是否持续增长）
         # =======================
-        curve["epoch"].append(epoch)
-        curve["train_loss"].append(loss_val)  # 最后一个 batch 的训练 loss
-        curve["val_loss"].append(val_loss_mean.item())
-
-        curve["user_ratio"].append(val_user_ratio_mean)
-        curve["server_ratio"].append(val_svr_ratio_mean)
-        curve["capacity_ratio"].append(val_cap_ratio_mean)
-        curve["prop_lat"].append(val_prop_lat_mean)
-
-        curve["lr"].append(lr_val)
-        curve["time"].append(time.time() - start_time)
+        # curve["epoch"].append(epoch)
+        # curve["train_loss"].append(loss_val)  # 最后一个 batch 的训练 loss
+        # curve["val_loss"].append(val_loss_mean.item())
+        #
+        # curve["user_ratio"].append(val_user_ratio_mean)
+        # curve["server_ratio"].append(val_svr_ratio_mean)
+        # curve["capacity_ratio"].append(val_cap_ratio_mean)
+        # curve["prop_lat"].append(val_prop_lat_mean)
+        #
+        # curve["lr"].append(lr_val)
+        # curve["time"].append(time.time() - start_time)
+        #
+        # 保存为 numpy，便于后续画图
+        # np.save(os.path.join(model_dir, "curve.npy"), curve)
 
         # 保存为 numpy，便于后续画图
-        np.save(os.path.join(model_dir, "curve.npy"), curve)
+        # np.save(os.path.join(model_dir, "curve.npy"), curve)
 
     total_time = (time.time() - start_time) / 3600
     print(f"✅ 总训练时间: {total_time:.2f} 小时")
